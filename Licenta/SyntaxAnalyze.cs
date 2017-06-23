@@ -20,7 +20,7 @@ namespace Licenta.Resources
         LanguageServiceClient syntaxAnalyze;
         TranslationClient translate;
         String textToAnalyze;
-        string language;
+        string language = "";
 
         public SyntaxAnalyze(String text)
         {
@@ -61,11 +61,9 @@ namespace Licenta.Resources
                 partOfSpeech.Text = "";
                 dependence.Text = "";
                 lemma.Text = "";
-                string part = response.Tokens[tokenIndex].PartOfSpeech.ToString();
-                part = part.Replace("\"", "");
-                part = part.Replace("{", "");
-                part = part.Replace("}", "");
                 tokenText.Text = response.Tokens[tokenIndex].Text.Content;
+                string part = response.Tokens[tokenIndex].PartOfSpeech.ToString();
+                part = part.Replace("\"", "").Replace("{", "").Replace("}", "");
                 string[] syntax = part.Split(',');
                 foreach (string s in syntax)
                     partOfSpeech.Text += "-> " + s + "\n";

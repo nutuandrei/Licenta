@@ -15,6 +15,7 @@ using System.Windows.Forms;
 using HtmlAgilityPack;
 using Google.Cloud.Translation.V2;
 using Licenta.Resources;
+using System.Xml;
 
 namespace Licenta
 {
@@ -36,7 +37,8 @@ namespace Licenta
         Boolean otherDomains = true;
         String mainDomain;
         int context;
-
+        XmlWriter writer;
+        List<Result> results;
         public Crawling()
         {
             InitializeComponent();
@@ -95,6 +97,7 @@ namespace Licenta
                             break;
                         }
                 }
+                results = new List<Result>();
                 parseThread = new Thread(() => Parse_Page(url, searchDepth));
                 parseThread.Start();
             }
@@ -102,7 +105,36 @@ namespace Licenta
             {
                 parseThread.Abort();
                 searchButton.Text = "Search";
+                SaveResults();
             }
+        }
+
+        public void SaveResults()
+        {
+            this.Invoke((MethodInvoker)delegate
+            {
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Indent = true;
+            writer = XmlWriter.Create(keywords[0] + "_" + DateTime.Now.ToString("HH-mm-ss_dd-M-yyyy") + ".xml", settings);
+            writer.WriteStartDocument();
+            writer.WriteStartElement("Search");
+            writer.WriteStartElement("Input");
+            writer.WriteElementString("Url", url);
+            writer.WriteElementString("Keywords", keywordTextBox.Text);
+            writer.WriteElementString("Depth", searchDepth.ToString());
+            writer.WriteElementString("Context", searchContext.Text);
+            writer.WriteEndElement();
+            foreach (Result res in results)
+            {
+                writer.WriteStartElement("result");
+                writer.WriteAttributeString("keyword", res.keyword);
+                writer.WriteAttributeString("url", res.url);
+                writer.WriteString(res.context);
+                writer.WriteEndElement();
+            }
+            writer.Flush();
+            writer.Close();
+            });
         }
 
         public String Fetch_Page(String url)
@@ -209,8 +241,8 @@ namespace Licenta
                             this.Invoke((MethodInvoker)delegate
                             {
                                 grid.Rows.Add(grid.Rows.Count, keyword.Trim(), url, elements[i].Trim());
+                                results.Add(new Result(url, keyword.Trim(), elements[i].Trim()));
                             });
-                            File.AppendAllText(@"results.txt", elements[i].Trim() + Environment.NewLine);
                         }
                     }
         }
@@ -258,6 +290,7 @@ namespace Licenta
                     this.Enabled = true;
                     searchButton.Text = "Search";
                 });
+                SaveResults();
             }
         }
 
