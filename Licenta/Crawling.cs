@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -10,10 +7,8 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using HtmlAgilityPack;
-using Google.Cloud.Translation.V2;
 using Licenta.Resources;
 using System.Xml;
 
@@ -30,13 +25,13 @@ namespace Licenta
         string[] keywords;
         string html;
         int searchDepth;
+        int context;
         HashSet<string> parsedAlready;
         List<String> refs;
         Thread parseThread;
         HtmlAgilityPack.HtmlDocument htmlSnippet = new HtmlAgilityPack.HtmlDocument();
         Boolean otherDomains = true;
         String mainDomain;
-        int context;
         XmlWriter writer;
         List<Result> results;
         public Crawling()
@@ -76,8 +71,6 @@ namespace Licenta
                     return;
                 }
                 searchDepth = Convert.ToInt16(this.depth.Text);
-                File.Delete("file.txt");
-                File.Delete("results.txt");
                 searchButton.Text = "Stop Searching";
                 switch (searchContext.Text)
                 {
@@ -109,40 +102,14 @@ namespace Licenta
             }
         }
 
-        public void SaveResults()
-        {
-            this.Invoke((MethodInvoker)delegate
-            {
-            XmlWriterSettings settings = new XmlWriterSettings();
-            settings.Indent = true;
-            writer = XmlWriter.Create(keywords[0] + "_" + DateTime.Now.ToString("HH-mm-ss_dd-M-yyyy") + ".xml", settings);
-            writer.WriteStartDocument();
-            writer.WriteStartElement("Search");
-            writer.WriteStartElement("Input");
-            writer.WriteElementString("Url", url);
-            writer.WriteElementString("Keywords", keywordTextBox.Text);
-            writer.WriteElementString("Depth", searchDepth.ToString());
-            writer.WriteElementString("Context", searchContext.Text);
-            writer.WriteEndElement();
-            foreach (Result res in results)
-            {
-                writer.WriteStartElement("result");
-                writer.WriteAttributeString("keyword", res.keyword);
-                writer.WriteAttributeString("url", res.url);
-                writer.WriteString(res.context);
-                writer.WriteEndElement();
-            }
-            writer.Flush();
-            writer.Close();
-            });
-        }
-
         public String Fetch_Page(String url)
         {
             String html;
             try
             {
                 request = (HttpWebRequest)WebRequest.Create(url);
+                request.Credentials = CredentialCache.DefaultCredentials;
+                request.UserAgent = ".NET Framework Test Client";
                 response = (HttpWebResponse)request.GetResponse();
                 stream = response.GetResponseStream();
                 reader = new StreamReader(stream, Encoding.UTF8);
@@ -170,7 +137,6 @@ namespace Licenta
                     if ((att.Value.Contains("://") || att.Value.Contains("www.")) && (!att.Value.Contains(mainDomain)))
                         continue;
                 hrefTags.Add(att.Value);
-                File.AppendAllText(@"agility.txt", att.Value + Environment.NewLine);
             }
             return hrefTags;
         }
@@ -276,8 +242,6 @@ namespace Licenta
                                 Parse_Page(link + reference, depth - 1);
                             else
                                 Parse_Page(link + "/" + reference, depth - 1);
-                            File.AppendAllText(@"file.txt", reference + Environment.NewLine);
-                            
                         }
                     }
                 }
@@ -292,6 +256,33 @@ namespace Licenta
                 });
                 SaveResults();
             }
+        }
+
+        public void SaveResults()
+        {
+            this.Invoke((MethodInvoker)delegate
+            {
+                XmlWriterSettings settings = new XmlWriterSettings();
+                settings.Indent = true;
+                writer = XmlWriter.Create(keywords[0] + "_" + DateTime.Now.ToString("HH-mm-ss_dd-M-yyyy") + ".xml", settings);
+                writer.WriteStartDocument();
+                writer.WriteStartElement("Search");
+                writer.WriteAttributeString("Url", url);
+                writer.WriteAttributeString("Keywords", keywordTextBox.Text);
+                writer.WriteAttributeString("Depth", searchDepth.ToString());
+                writer.WriteAttributeString("Context", searchContext.Text);
+                foreach (Result res in results)
+                {
+                    writer.WriteStartElement("result");
+                    writer.WriteAttributeString("keyword", res.keyword);
+                    writer.WriteAttributeString("url", res.url);
+                    writer.WriteString(res.context);
+                    writer.WriteEndElement();
+                }
+                writer.WriteEndElement();
+                writer.Flush();
+                writer.Close();
+            });
         }
 
         private void keywordTextBox_KeyPress(object sender, KeyPressEventArgs e)
